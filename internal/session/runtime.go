@@ -513,7 +513,9 @@ func (r *Runtime) tick(ctx context.Context, client *llm.Client, in harness.Coach
 		ElapsedSec: in.ElapsedSec,
 	})
 
+	streamed := false
 	body, err := harness.Speak(ctx, client, in, decision, func(chunk string) {
+		streamed = true
 		bus.MessageContent(messageID, chunk)
 	})
 	if err != nil {
@@ -523,6 +525,12 @@ func (r *Runtime) tick(ctx context.Context, client *llm.Client, in harness.Coach
 		// The bubble is already open; close it with the point rather than
 		// leaving it hanging.
 		body = decision.Point
+	}
+	// Speak also falls back to the decision's point when the model streamed
+	// nothing. Either way the body exists but never went over the wire, so the
+	// bubble would stay empty while the transcript held text. Send it now:
+	// what the UI shows and what the session records must be the same string.
+	if !streamed && body != "" {
 		bus.MessageContent(messageID, body)
 	}
 

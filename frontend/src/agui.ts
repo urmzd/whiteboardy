@@ -115,8 +115,14 @@ export function reduce(state: SessionState, event: AguiEvent): SessionState {
       if (!event.name) return state;
       return { ...state, activeSteps: state.activeSteps.filter((s) => s !== event.name) };
 
-    case "STATE_SNAPSHOT":
-      return { ...state, status: event.data as domain.Status };
+    case "STATE_SNAPSHOT": {
+      const status = event.data as domain.Status | null;
+      // A snapshot carries the authoritative transcript, so use it to rebuild
+      // the feed. Without this, any message emitted while the window was
+      // reloading is gone for good: the feed is otherwise assembled purely
+      // from live events, and nothing replays them.
+      return { ...state, status, messages: rehydrate(state.messages, status) };
+    }
 
     case "STATE_DELTA": {
       const d = event.data as StateDelta;
@@ -163,6 +169,45 @@ export function reduce(state: SessionState, event: AguiEvent): SessionState {
     default:
       return state;
   }
+}
+
+/**
+ * rehydrate merges the transcript from a state snapshot into the live message
+ * list. A message still streaming keeps whatever has arrived so far, because
+ * the transcript only gains an entry once the backend has finished writing it;
+ * overwriting a half-streamed bubble with nothing would make it flicker.
+ */
+function rehydrate(current: Message[], status: domain.Status | null): Message[] {
+  const events = status?.events ?? [];
+  if (events.length === 0) return current;
+
+  const live = new Map(current.map((m) => [m.id, m]));
+  const merged: Message[] = events.map((e) => {
+    const existing = live.get(e.id);
+    if (existing && !existing.done) return existing;
+    return {
+      id: e.id,
+      role:
+        e.kind === "hint" || e.kind === "probe" || e.kind === "praise"
+          ? "assistant"
+          : "system",
+      kind: e.kind,
+      severity: e.severity,
+      title: e.title,
+      body: e.body,
+      elapsedSec: e.elapsedSec,
+      done: true,
+      areas: e.areas ?? [],
+    } as Message;
+  });
+
+  // A message that opened but has not reached the transcript yet is still in
+  // flight; keep it on the end so its caret survives the snapshot.
+  const seen = new Set(merged.map((m) => m.id));
+  for (const m of current) {
+    if (!seen.has(m.id)) merged.push(m);
+  }
+  return merged;
 }
 
 /** subscribe wires the Wails channel to a handler and returns an unsubscriber. */
