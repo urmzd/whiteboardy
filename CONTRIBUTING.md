@@ -46,21 +46,26 @@ show up as a small model silently dropping a field rather than as an error.
 The README images live in `showcase/` and are shot from the real app running under
 `wails dev`, never from a mock.
 
-`make record` runs [teasr](https://github.com/urmzd/teasr), which starts the dev server
-and captures `demo-progress.png`. That is the only screen teasr can do on its own: its
-web backend renders at a fixed 800x600 and cannot type into React-controlled inputs.
+All four are shot at 1440x920 so the README gallery lines up.
 
-The other three are captured by driving a live session over the Chrome DevTools Protocol
-at 1440x920, because a populated board and a debrief both need a real model and real work:
+| Image | Screen | Captured by |
+|-------|--------|-------------|
+| `demo.png` | A session in progress: brief, board, coach | CDP, live session |
+| `demo-review.png` | The debrief | CDP, live session |
+| `demo-setup.png` | The setup screen | CDP |
+| `demo-progress.png` | The cross-session profile | CDP, or `make record` |
 
-| Image | Screen |
-|-------|--------|
-| `demo.png` | A session in progress: brief, board, coach |
-| `demo-review.png` | The debrief |
-| `demo-setup.png` | The setup screen |
+`make record` runs [teasr](https://github.com/urmzd/teasr) against the dev server and
+re-captures the progress screen. It is the only screen teasr can script: its web backend
+cannot type into React-controlled inputs, and a populated board and a debrief both need a
+real model and real work.
 
-Re-shoot whichever ones a UI change invalidates. Do not hand-edit them, and do not stage
-a board that the app could not actually produce.
+teasr 0.19.2 also renders at 800x600 regardless of the viewport block in `teasr.toml`, so
+`make record` breaks the gallery's matching aspect ratios. Re-shoot the progress screen
+over CDP at 1440x920 afterwards if that matters.
+
+Re-shoot whichever images a UI change invalidates. Do not hand-edit them, and do not stage
+a board the app could not actually produce.
 
 ## Commit convention
 

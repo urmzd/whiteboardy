@@ -1,13 +1,19 @@
 # Showcase capture. `wails dev` exposes the app to a browser at :34115 with the
 # Go methods bound, so the real app is what gets photographed, not a mock.
 #
-# Scope note: teasr's web backend renders at a fixed 800x600 here regardless of
-# the scene's viewport setting, and it cannot type into React-controlled inputs.
-# The progress screen is the only one that fits that box and needs no typing, so
-# it is the only one scripted. The setup screen, a populated board, and a
-# debrief are captured over the Chrome DevTools Protocol at 1440x920 instead:
-# the last two need a real model and real work, which no scene can script. See
+# Scope note: only the progress screen is scripted. teasr's web backend cannot
+# type into React-controlled inputs, and a populated board and a debrief both
+# need a real model and real work, which no scene definition can script. Those
+# three are captured over the Chrome DevTools Protocol at 1440x920. See
 # "Capturing the showcase" in CONTRIBUTING.md.
+#
+# Known mismatch: teasr 0.19.2 renders at 800x600 here regardless of this
+# viewport block, so re-running `make record` produces a progress image with a
+# different aspect ratio to the other three and the README gallery stops lining
+# up. Re-shoot it over CDP afterwards if that matters.
+[viewport]
+width = 1440
+height = 920
 
 [output]
 dir = "./showcase"

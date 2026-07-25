@@ -6,7 +6,8 @@ Go backend, React/TypeScript frontend, communicating over an AG-UI shaped event 
 
 ## Docs
 
-- [README](README.md): What it is, install, quick start, providers, architecture, known gaps
+- [README](README.md): What it is, install, quick start, providers, known gaps
+- [docs/architecture.md](docs/architecture.md): Event stream, package map, why generation and coaching are each two LLM calls, what is computed rather than asked for
 - [AGENTS.md](AGENTS.md): Package map, non-obvious invariants, commands, testing strategy, code style
 - [CONTRIBUTING.md](CONTRIBUTING.md): Toolchain, development loop, prompt-change workflow, commit convention
 - [SECURITY.md](SECURITY.md): Vulnerability reporting

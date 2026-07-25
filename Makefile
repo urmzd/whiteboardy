@@ -21,8 +21,12 @@ init:
 dev:
 	$(WAILS) dev
 
+# vite clears frontend/dist on every build, which takes the tracked .gitkeep
+# with it and quietly stages a deletion that breaks //go:embed on a fresh
+# clone. Put it back every time rather than relying on anyone noticing.
 $(DIST):
 	cd frontend && npm install && npm run build
+	touch frontend/dist/.gitkeep
 
 build: $(DIST)
 	$(WAILS) build
