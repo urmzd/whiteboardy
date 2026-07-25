@@ -74,11 +74,19 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Client, error) {
 		// num_ctx is set explicitly because ollama's default window is far
 		// smaller than a review prompt (problem, hidden rubric, whole board,
 		// event log) and it truncates past the limit silently.
+		//
+		// Thinking is off for every call. Schema-constrained calls need it off
+		// anyway, and for the coach's prose it is actively harmful: a reasoning
+		// model spends tens of seconds thinking before emitting its first text
+		// token, so the message bubble opens and then sits visibly empty. The
+		// judgment already happened in the decision call; this one just writes
+		// two sentences.
 		p = ollama.NewAdapter(ollama.NewClient(host, cfg.Model, "",
 			ollama.WithChatOptions(ollama.Options{
 				NumCtx:      contextBudget,
 				Temperature: Temperature,
 			}),
+			ollama.WithThink(false),
 		))
 	case KindOpenAI:
 		if cfg.APIKey == "" {

@@ -1,12 +1,13 @@
 # Showcase capture. `wails dev` exposes the app to a browser at :34115 with the
 # Go methods bound, so the real app is what gets photographed, not a mock.
 #
-# Only the screens reachable from a cold load are scripted here. teasr's web
-# backend can click but cannot type into React-controlled inputs, and the board
-# lives in frontend state rather than in the backend, so the populated
-# whiteboard (showcase/demo.png) and the debrief (showcase/demo-review.png) were
-# captured by driving a live session over the Chrome DevTools Protocol. Re-shoot
-# those two by hand after a UI change.
+# Scope note: teasr's web backend renders at a fixed 800x600 here regardless of
+# the scene's viewport setting, and it cannot type into React-controlled inputs.
+# The progress screen is the only one that fits that box and needs no typing, so
+# it is the only one scripted. The setup screen, a populated board, and a
+# debrief are captured over the Chrome DevTools Protocol at 1440x920 instead:
+# the last two need a real model and real work, which no scene can script. See
+# "Capturing the showcase" in CONTRIBUTING.md.
 
 [output]
 dir = "./showcase"
@@ -20,25 +21,11 @@ url = "http://localhost:34115"
 # A cold `wails dev` compiles the Go side and installs the frontend first.
 timeout = 240000
 
-# ── Setup: provider, model, mode, level, timebox ──
-[[scenes]]
-type = "web"
-name = "demo-setup"
-uri = "/"
-viewport = { width = 1440, height = 920 }
-
-[[scenes.interactions]]
-type = "wait"
-duration = 3000
-[[scenes.interactions]]
-type = "snapshot"
-
 # ── Progress: the cross-session skill profile ──
 [[scenes]]
 type = "web"
 name = "demo-progress"
 uri = "/"
-viewport = { width = 1440, height = 920 }
 
 [[scenes.interactions]]
 type = "wait"

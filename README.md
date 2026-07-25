@@ -92,6 +92,24 @@ The app lands in `build/bin/`. For a live-reloading dev loop, use `make dev`.
 Sessions are written to `~/.whiteboardy/sessions` as plain JSON. Nothing leaves your
 machine unless you point it at a hosted provider.
 
+## The debrief
+
+Every criterion is scored 0-4 with the evidence that earned it, quoted from your board
+and your notes. The overall number is computed from those scores and their weights, so it
+cannot drift from the reasoning behind it.
+
+<div align="center">
+  <img src="showcase/demo-review.png" alt="The debrief: an overall score, a verdict, and per-criterion scores with quoted evidence" width="80%">
+</div>
+
+After a few sessions, the per-criterion scores aggregate by skill area. Ranking is
+withheld until an area has at least two samples, and trend needs three, because calling
+something a weakness off one data point is noise dressed as insight.
+
+<div align="center">
+  <img src="showcase/demo-progress.png" alt="The progress screen: sessions, average score, and a bar per skill area" width="70%">
+</div>
+
 ## Providers
 
 | Provider | Model discovery | Notes |

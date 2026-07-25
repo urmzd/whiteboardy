@@ -41,6 +41,27 @@ output in your PR.
 Try it against a small model too (`make live MODEL=qwen3.5:2b`). Most prompt regressions
 show up as a small model silently dropping a field rather than as an error.
 
+## Capturing the showcase
+
+The README images live in `showcase/` and are shot from the real app running under
+`wails dev`, never from a mock.
+
+`make record` runs [teasr](https://github.com/urmzd/teasr), which starts the dev server
+and captures `demo-progress.png`. That is the only screen teasr can do on its own: its
+web backend renders at a fixed 800x600 and cannot type into React-controlled inputs.
+
+The other three are captured by driving a live session over the Chrome DevTools Protocol
+at 1440x920, because a populated board and a debrief both need a real model and real work:
+
+| Image | Screen |
+|-------|--------|
+| `demo.png` | A session in progress: brief, board, coach |
+| `demo-review.png` | The debrief |
+| `demo-setup.png` | The setup screen |
+
+Re-shoot whichever ones a UI change invalidates. Do not hand-edit them, and do not stage
+a board that the app could not actually produce.
+
 ## Commit convention
 
 Angular conventional commits. `sr` derives releases from them, so the type matters:
