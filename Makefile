@@ -5,24 +5,31 @@
 # depend on the dist marker below rather than assuming it is there.
 DIST := frontend/dist/index.html
 
+# `go install` puts wails in GOPATH/bin, which is on an interactive shell's PATH
+# but not necessarily on make's. Resolve it explicitly so a fresh clone works
+# without the caller having to fix their environment first.
+WAILS_VERSION := v2.11.0
+WAILS := $(shell command -v wails 2>/dev/null || echo $(shell go env GOPATH)/bin/wails)
+
 all: check
 
 init:
 	go mod download
 	cd frontend && npm install
+	go install github.com/wailsapp/wails/v2/cmd/wails@$(WAILS_VERSION)
 
 dev:
-	wails dev
+	$(WAILS) dev
 
 $(DIST):
 	cd frontend && npm install && npm run build
 
 build: $(DIST)
-	wails build
+	$(WAILS) build
 
 # Signed/notarized macOS bundle and platform installers.
 package: $(DIST)
-	wails build -clean -platform darwin/universal
+	$(WAILS) build -clean -platform darwin/universal
 
 test: $(DIST)
 	go test ./...
@@ -48,7 +55,7 @@ typecheck:
 # Regenerates frontend/wailsjs from the Go binding surface in app.go. Run this
 # after changing any exported method on App or any type it returns.
 bindings:
-	wails generate module
+	$(WAILS) generate module
 
 check: fmt vet lint test typecheck
 
