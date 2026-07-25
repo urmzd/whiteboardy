@@ -95,7 +95,14 @@ jobs:
       - name: Install wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0
 
+      # Wails defaults to webkit2gtk-4.0, which Ubuntu 24.04 no longer ships.
+      # The webkit2_41 tag targets the 4.1 series that is actually available.
+      - name: Build app (Linux)
+        if: runner.os == 'Linux'
+        run: wails build -s -skipbindings -tags webkit2_41 -platform ${{ matrix.platform }}
+
       - name: Build app
+        if: runner.os != 'Linux'
         run: wails build -s -skipbindings -platform ${{ matrix.platform }}
 
       # macOS produces a .app bundle and Windows a bare .exe, so each platform
