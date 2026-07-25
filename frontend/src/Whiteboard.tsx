@@ -133,20 +133,31 @@ export function Whiteboard({ onChange }: Props) {
     [setNodes],
   );
 
+  // New boxes land on a grid wide enough that they never cover each other. A
+  // small diagonal stagger looks tidier but buries the box you just added under
+  // the next one, which is exactly when you want to type into it.
+  const COL_WIDTH = 260;
+  const ROW_HEIGHT = 190;
+  const PER_ROW = 4;
+
   const addNode = useCallback(
     (kind: NodeKind) => {
       const id = nextId();
-      // Stagger placement so consecutive additions do not stack on one spot.
-      const offset = (seq % 6) * 34;
-      setNodes((current) => [
-        ...current,
-        {
-          id,
-          type: "component",
-          position: { x: 90 + offset, y: 90 + offset },
-          data: { kind, label: "", detail: "", onChange: patchNode },
-        },
-      ]);
+      setNodes((current) => {
+        const i = current.length;
+        return [
+          ...current,
+          {
+            id,
+            type: "component",
+            position: {
+              x: 60 + (i % PER_ROW) * COL_WIDTH,
+              y: 60 + Math.floor(i / PER_ROW) * ROW_HEIGHT,
+            },
+            data: { kind, label: "", detail: "", onChange: patchNode },
+          },
+        ];
+      });
     },
     [patchNode, setNodes],
   );
@@ -233,6 +244,11 @@ export function Whiteboard({ onChange }: Props) {
             setEdgeLabel(typeof edge.label === "string" ? edge.label : "");
           }}
           fitView
+          // Without a zoom cap, a board with two boxes fills the screen with
+          // them and the text renders comically large.
+          fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
+          minZoom={0.2}
+          maxZoom={1.75}
           proOptions={{ hideAttribution: true }}
           deleteKeyCode={["Backspace", "Delete"]}
         >
