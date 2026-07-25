@@ -28,13 +28,31 @@ jobs:
   plan:
     needs: ci
     runs-on: ubuntu-latest
+    # The secrets context is not available in a job-level `if`, so it is lifted
+    # into env where step-level conditions can see it.
+    env:
+      RELEASER_APP_ID: ${{ secrets.SR_RELEASER_APP_ID }}
     outputs:
       released: ${{ steps.plan.outputs.released }}
       tag: ${{ steps.plan.outputs.tag }}
       version: ${{ steps.plan.outputs.version }}
     steps:
+      # While the project is in beta the release app may not be installed on the
+      # repo yet. Skipping cleanly keeps main green instead of failing every
+      # push on a credential the repo has deliberately not been given.
+      - name: Check release credentials
+        id: creds
+        run: |
+          if [ -n "$RELEASER_APP_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Releases not configured::SR_RELEASER_APP_ID is unset, so no release will be cut. CI still ran."
+          fi
+
       - name: Generate app token
         id: app-token
+        if: steps.creds.outputs.configured == 'true'
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.SR_RELEASER_APP_ID }}
@@ -42,12 +60,14 @@ jobs:
           repositories: ${{ github.event.repository.name }}
 
       - uses: actions/checkout@v6
+        if: steps.creds.outputs.configured == 'true'
         with:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
       - uses: urmzd/sr@v8
         id: plan
+        if: steps.creds.outputs.configured == 'true'
         with:
           mode: plan
           github-token: ${{ steps.app-token.outputs.token }}
