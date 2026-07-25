@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/urmzd/whiteboardy/actions/workflows/ci.yml"><img src="https://github.com/urmzd/whiteboardy/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/urmzd/whiteboardy/actions/workflows/release.yml"><img src="https://img.shields.io/github/actions/workflow/status/urmzd/whiteboardy/release.yml?branch=main&label=CI" alt="CI"></a>
   &nbsp;
   <a href="LICENSE"><img src="https://img.shields.io/github/license/urmzd/whiteboardy" alt="License"></a>
 </p>
