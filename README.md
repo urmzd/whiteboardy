@@ -8,6 +8,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/status-beta-orange.svg)](#known-gaps)
 
+<img src="showcase/demo.png" alt="A senior-level system design session: the brief on the left, the board in the middle, the coach on the right" width="80%">
+
 </div>
 
 > [!WARNING]
@@ -82,6 +84,10 @@ The app lands in `build/bin/`. For a live-reloading dev loop, use `make dev`.
    something worth saying.
 5. Hit **Finish & score** for the debrief, then check **Progress** once you have a few
    sessions behind you.
+
+<div align="center">
+  <img src="showcase/demo-setup.png" alt="The setup screen: mode, level, timebox, provider, and model" width="80%">
+</div>
 
 Sessions are written to `~/.whiteboardy/sessions` as plain JSON. Nothing leaves your
 machine unless you point it at a hosted provider.
