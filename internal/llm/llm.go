@@ -5,28 +5,28 @@ package llm
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 
 	agentsdk "github.com/urmzd/saige/agent"
-	"github.com/urmzd/saige/agent/provider/anthropic"
-	"github.com/urmzd/saige/agent/provider/google"
+	"github.com/urmzd/saige/agent/provider"
+	"github.com/urmzd/saige/agent/provider/catalog"
 	"github.com/urmzd/saige/agent/provider/ollama"
-	"github.com/urmzd/saige/agent/provider/openai"
+	"github.com/urmzd/saige/agent/provider/retry"
 	"github.com/urmzd/saige/agent/types"
 )
 
-// Kind identifies a supported provider backend.
+// Kind identifies a supported provider backend. The values match saige's
+// provider names, so a Kind passes straight to provider.Build.
 type Kind string
 
 const (
-	KindOllama    Kind = "ollama"
-	KindOpenAI    Kind = "openai"
-	KindAnthropic Kind = "anthropic"
-	KindGoogle    Kind = "google"
+	KindOllama    Kind = provider.Ollama
+	KindOpenAI    Kind = provider.OpenAI
+	KindAnthropic Kind = provider.Anthropic
+	KindGoogle    Kind = provider.Google
 )
 
 // Config describes how to reach a model.
@@ -42,7 +42,7 @@ type Config struct {
 }
 
 // DefaultOllamaHost is where a local ollama daemon listens.
-const DefaultOllamaHost = "http://localhost:11434"
+const DefaultOllamaHost = provider.DefaultOllamaHost
 
 // ErrNoModel is returned when a config names no model.
 var ErrNoModel = errors.New("llm: no model configured")
@@ -63,55 +63,82 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Client, error) {
 	if strings.TrimSpace(cfg.Model) == "" {
 		return nil, ErrNoModel
 	}
+	kind := cfg.Kind
+	if kind == "" {
+		kind = KindOllama
+	}
 
-	var p types.Provider
-	switch cfg.Kind {
-	case KindOllama, "":
-		host := cfg.Host
-		if host == "" {
-			host = DefaultOllamaHost
+	pc := provider.Config{
+		Provider: string(kind),
+		Model:    cfg.Model,
+		Options:  requestOptions(kind, cfg.Model),
+		// Settings are the only source of credentials and hosts, so the
+		// environment is never consulted.
+		Getenv: func(string) string { return "" },
+	}
+	switch kind {
+	case KindOllama:
+		pc.BaseURL = cfg.Host
+	default:
+		if cfg.APIKey == "" {
+			return nil, fmt.Errorf("llm: %s requires an api key", kind)
 		}
+		pc.APIKey = cfg.APIKey
+	}
+
+	p, err := provider.Build(ctx, pc)
+	if err != nil {
+		return nil, fmt.Errorf("llm: %w", err)
+	}
+	switch kind {
+	case KindOllama:
 		// num_ctx is set explicitly because ollama's default window is far
 		// smaller than a review prompt (problem, hidden rubric, whole board,
-		// event log) and it truncates past the limit silently.
-		//
-		// Thinking is off for every call. Schema-constrained calls need it off
-		// anyway, and for the coach's prose it is actively harmful: a reasoning
-		// model spends tens of seconds thinking before emitting its first text
-		// token, so the message bubble opens and then sits visibly empty. The
-		// judgment already happened in the decision call; this one just writes
-		// two sentences.
-		p = ollama.NewAdapter(ollama.NewClient(host, cfg.Model, "",
-			ollama.WithChatOptions(ollama.Options{
-				NumCtx:      contextBudget,
-				Temperature: Temperature,
-			}),
-			ollama.WithThink(false),
-		))
-	case KindOpenAI:
-		if cfg.APIKey == "" {
-			return nil, errors.New("llm: openai requires an api key")
+		// event log) and it truncates past the limit silently. It has no
+		// provider-neutral option, so it goes on the client Build made.
+		if a, ok := p.(*ollama.Adapter); ok {
+			if opts, ok := a.Client.ChatOptions.(map[string]any); ok {
+				opts["num_ctx"] = contextBudget
+			} else {
+				a.Client.ChatOptions = map[string]any{"num_ctx": contextBudget}
+			}
 		}
-		p = openai.NewAdapter(cfg.APIKey, cfg.Model)
-	case KindAnthropic:
-		if cfg.APIKey == "" {
-			return nil, errors.New("llm: anthropic requires an api key")
-		}
-		p = anthropic.NewAdapter(cfg.APIKey, cfg.Model)
-	case KindGoogle:
-		if cfg.APIKey == "" {
-			return nil, errors.New("llm: google requires an api key")
-		}
-		adapter, err := google.NewAdapter(ctx, cfg.APIKey, cfg.Model)
-		if err != nil {
-			return nil, fmt.Errorf("llm: google adapter: %w", err)
-		}
-		p = adapter
-	default:
-		return nil, fmt.Errorf("llm: unknown provider kind %q", cfg.Kind)
+	case KindAnthropic, KindOpenAI:
+		// These adapters no longer retry inside the SDK.
+		p = retry.New(p, retry.DefaultConfig())
 	}
 
 	return &Client{provider: p, cfg: cfg, log: log}, nil
+}
+
+// requestOptions returns the request options for a model. Each control is
+// sent only where the catalog says the model accepts it, so Build never
+// rejects a model the user picked.
+//
+// Temperature is left out where it would be rejected, for example on
+// reasoning models that only sample at their defaults.
+//
+// For ollama, thinking is off for every call on models that can toggle it.
+// Schema-constrained calls need it off anyway, and for the coach's prose it
+// is actively harmful: a reasoning model spends tens of seconds thinking
+// before emitting its first text token, so the message bubble opens and then
+// sits visibly empty. The judgment already happened in the decision call;
+// this one just writes two sentences.
+func requestOptions(kind Kind, model string) types.RequestOptions {
+	caps := catalog.MustLookup(string(kind), model)
+	var o types.RequestOptions
+	try := func(set func(*types.RequestOptions)) {
+		next := o.Clone()
+		set(&next)
+		if caps.ValidateOptions(next) == nil {
+			o = next
+		}
+	}
+	if kind == KindOllama && caps.Supports(types.CapReasoningToggle) {
+		try(func(r *types.RequestOptions) { off := false; r.ReasoningEnabled = &off })
+	}
+	try(func(r *types.RequestOptions) { t := Temperature; r.Temperature = &t })
+	return o
 }
 
 // Config returns the config the client was built from, with the API key blanked.
@@ -131,7 +158,14 @@ func (c *Client) Model() string { return c.cfg.Model }
 
 // Text runs a single-turn completion and returns the accumulated text.
 func (c *Client) Text(ctx context.Context, system, user string) (string, error) {
-	return c.run(ctx, system, user, nil)
+	text, err := agentsdk.CollectText(c.agent(system).Invoke(ctx, prompt(user)))
+	if err != nil {
+		return text, fmt.Errorf("llm: %w", err)
+	}
+	if strings.TrimSpace(text) == "" {
+		return "", errors.New("llm: model returned empty response")
+	}
+	return text, nil
 }
 
 // TextStream runs a single-turn completion and calls onDelta for each chunk as
@@ -139,57 +173,37 @@ func (c *Client) Text(ctx context.Context, system, user string) (string, error) 
 // being written; schema-constrained calls go through Structured instead,
 // because partial JSON is not something a UI can render.
 func (c *Client) TextStream(ctx context.Context, system, user string, onDelta func(string)) (string, error) {
-	a := agentsdk.NewAgent(agentsdk.AgentConfig{
-		Name:         "whiteboardy",
-		SystemPrompt: system,
-		Provider:     c.provider,
-	}, agentsdk.WithMaxIter(1), agentsdk.WithLogger(c.log))
-
-	stream := a.Invoke(ctx, []types.Message{types.NewUserMessage(user)})
-
-	var b strings.Builder
-	var streamErr error
-	for delta := range stream.Deltas() {
-		switch d := delta.(type) {
-		case types.TextContentDelta:
-			b.WriteString(d.Content)
-			if onDelta != nil && d.Content != "" {
-				onDelta(d.Content)
-			}
-		case types.ErrorDelta:
-			streamErr = d.Error
+	t, err := agentsdk.Collect(c.agent(system).Invoke(ctx, prompt(user)), func(d types.Delta) {
+		if td, ok := d.(types.TextContentDelta); ok && onDelta != nil && td.Content != "" {
+			onDelta(td.Content)
 		}
+	})
+	if err != nil {
+		return t.Text, fmt.Errorf("llm: %w", err)
 	}
-	if err := stream.Wait(); err != nil {
-		return b.String(), fmt.Errorf("llm: %w", err)
-	}
-	if streamErr != nil {
-		return b.String(), fmt.Errorf("llm: %w", streamErr)
-	}
-	return b.String(), nil
+	return t.Text, nil
 }
+
+// structuredRepairs is how many times an answer that fails to parse or match
+// the schema is sent back to the model with the error. Small local models
+// occasionally return an empty or malformed answer; one retry recovers it.
+const structuredRepairs = 1
 
 // Structured runs a single-turn completion constrained to T's JSON schema and
 // unmarshals the result. Schema mutators let callers narrow enums that depend
 // on runtime state (for example the skill areas valid for the current mode).
+// The answer is extracted tolerantly (code fences, prose, <think> blocks).
 func Structured[T any](ctx context.Context, c *Client, system, user string, mutators ...func(*types.ParameterSchema)) (T, error) {
-	var out T
 	schema := types.SchemaFrom[T]()
 	for _, m := range mutators {
 		m(&schema)
 	}
-
-	raw, err := c.run(ctx, system, user, &schema)
+	out, _, err := agentsdk.Structured(ctx, c.agent(system), prompt(user), agentsdk.OutputSpec[T]{
+		Schema: &schema,
+		Repair: structuredRepairs,
+	})
 	if err != nil {
-		return out, err
-	}
-
-	body, err := extractJSON(raw)
-	if err != nil {
-		return out, fmt.Errorf("llm: %w (model returned %d chars)", err, len(raw))
-	}
-	if err := json.Unmarshal([]byte(body), &out); err != nil {
-		return out, fmt.Errorf("llm: decode %T: %w", out, err)
+		return out, fmt.Errorf("llm: %w", err)
 	}
 	return out, nil
 }
@@ -205,89 +219,16 @@ const Temperature = 0.4
 // laptop still fits it in memory.
 const contextBudget = 16384
 
-func (c *Client) run(ctx context.Context, system, user string, schema *types.ParameterSchema) (string, error) {
-	opts := []agentsdk.AgentOption{
-		agentsdk.WithMaxIter(1),
-		agentsdk.WithLogger(c.log),
-	}
-	if schema != nil {
-		opts = append(opts, agentsdk.WithResponseSchema(schema))
-	}
-
-	a := agentsdk.NewAgent(agentsdk.AgentConfig{
+// agent builds a single-turn agent. Each call gets its own, so concurrent
+// generations never share a conversation tree.
+func (c *Client) agent(system string) *agentsdk.Agent {
+	return agentsdk.NewAgent(agentsdk.AgentConfig{
 		Name:         "whiteboardy",
 		SystemPrompt: system,
 		Provider:     c.provider,
-	}, opts...)
-
-	stream := a.Invoke(ctx, []types.Message{types.NewUserMessage(user)})
-
-	var b, thinking strings.Builder
-	var streamErr error
-	for delta := range stream.Deltas() {
-		switch d := delta.(type) {
-		case types.TextContentDelta:
-			b.WriteString(d.Content)
-		case types.ThinkingContentDelta:
-			// Reasoning models sometimes emit the whole answer inside the
-			// thinking channel when a response schema is in play. Keep it as a
-			// fallback rather than reporting an empty response.
-			thinking.WriteString(d.Content)
-		case types.ErrorDelta:
-			streamErr = d.Error
-		}
-	}
-	if err := stream.Wait(); err != nil {
-		return b.String(), fmt.Errorf("llm: %w", err)
-	}
-	if streamErr != nil {
-		return b.String(), fmt.Errorf("llm: %w", streamErr)
-	}
-	if strings.TrimSpace(b.String()) == "" {
-		if t := strings.TrimSpace(thinking.String()); t != "" {
-			c.log.Warn("llm: model emitted only reasoning content, falling back to it",
-				"model", c.cfg.Model, "chars", len(t))
-			return t, nil
-		}
-		return "", errors.New("llm: model returned empty response")
-	}
-	return b.String(), nil
+	}, agentsdk.WithMaxIter(1), agentsdk.WithLogger(c.log))
 }
 
-// extractJSON pulls a JSON object out of a model response. Schema-constrained
-// providers return bare JSON, but local models sometimes wrap it in a fence or
-// prefix it with a sentence, and reasoning models emit a <think> block first.
-func extractJSON(raw string) (string, error) {
-	s := strings.TrimSpace(raw)
-
-	// Drop reasoning preambles.
-	if i := strings.LastIndex(s, "</think>"); i >= 0 {
-		s = strings.TrimSpace(s[i+len("</think>"):])
-	}
-
-	// Unwrap a fenced block.
-	if strings.HasPrefix(s, "```") {
-		if nl := strings.IndexByte(s, '\n'); nl >= 0 {
-			s = s[nl+1:]
-		}
-		if end := strings.LastIndex(s, "```"); end >= 0 {
-			s = s[:end]
-		}
-		s = strings.TrimSpace(s)
-	}
-
-	if json.Valid([]byte(s)) {
-		return s, nil
-	}
-
-	// Fall back to the widest balanced object in the response.
-	start := strings.IndexByte(s, '{')
-	end := strings.LastIndexByte(s, '}')
-	if start >= 0 && end > start {
-		candidate := s[start : end+1]
-		if json.Valid([]byte(candidate)) {
-			return candidate, nil
-		}
-	}
-	return "", errors.New("no valid JSON object in response")
+func prompt(user string) []types.Message {
+	return []types.Message{types.NewUserMessage(user)}
 }
