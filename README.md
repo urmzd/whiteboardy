@@ -62,7 +62,7 @@ possible instead of pattern-matching on pixels.
 
 | Requirement | Version |
 |-------------|---------|
-| Go | 1.25+ |
+| Go | 1.26.9+ |
 | Node | 22+ |
 | Wails | v2.11 |
 | Ollama | any recent, with a model pulled |

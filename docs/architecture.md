@@ -88,10 +88,12 @@ review prompt (problem, hidden rubric, whole board, event log) and it truncates 
 limit silently, turning an oversized prompt into a confidently wrong answer rather than an
 error.
 
-**Thinking is disabled.** Schema-constrained calls need it off because the format grammar
+**Thinking is disabled** on models that can toggle it. Schema-constrained calls need it off because the format grammar
 applies to every token the model emits, including reasoning. For the coach's prose it is
 also harmful: a reasoning model spends tens of seconds thinking before its first text
 token, so the message bubble opens and then sits visibly empty.
 
-Both are exposed by [saige](https://github.com/urmzd/saige)'s ollama provider via
-`WithChatOptions` and `WithThink`.
+The client is built with [saige](https://github.com/urmzd/saige)'s `provider.Build`, which
+sends temperature and the thinking toggle only where its model catalog says the model
+accepts them. `num_ctx` has no provider-neutral option, so it is added to the built
+client's chat options.
