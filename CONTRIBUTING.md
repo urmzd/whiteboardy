@@ -5,7 +5,7 @@ still moving, so expect churn in `internal/harness` in particular.
 
 ## Prerequisites
 
-- [Go 1.25+](https://go.dev)
+- [Go 1.26.9+](https://go.dev)
 - [Node 22+](https://nodejs.org)
 - [Wails v2](https://wails.io): `go install github.com/wailsapp/wails/v2/cmd/wails@v2.11.0`
 - [Ollama](https://ollama.com) with a model pulled, to run the live tests
