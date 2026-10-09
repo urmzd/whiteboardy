@@ -32,7 +32,7 @@ const (
 // Config describes how to reach a model.
 type Config struct {
 	Kind Kind `json:"kind"`
-	// Model is the model identifier, e.g. "qwen3.5:9b" or "claude-sonnet-5".
+	// Model is the model identifier, e.g. "qwen3.5:9b" or "claude-haiku-5-5".
 	Model string `json:"model"`
 	// Host is the base URL. Only meaningful for ollama; defaults to the local
 	// daemon when empty.
