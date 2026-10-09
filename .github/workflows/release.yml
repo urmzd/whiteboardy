@@ -65,7 +65,7 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: urmzd/sr@v8
+      - uses: urmzd/sr@v9
         id: plan
         if: steps.creds.outputs.configured == 'true'
         with:
@@ -180,7 +180,7 @@ jobs:
           merge-multiple: true
 
       - name: Release
-        uses: urmzd/sr@v8
+        uses: urmzd/sr@v9
         with:
           mode: release
           github-token: ${{ steps.app-token.outputs.token }}
