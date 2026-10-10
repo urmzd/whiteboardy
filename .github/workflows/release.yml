@@ -26,6 +26,7 @@ jobs:
   # Publishing the release and then uploading assets is not an option: GitHub
   # rejects uploads to an already-published immutable release.
   plan:
+    environment: release
     needs: ci
     runs-on: ubuntu-latest
     # The secrets context is not available in a job-level `if`, so it is lifted
@@ -55,7 +56,7 @@ jobs:
         if: steps.creds.outputs.configured == 'true'
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.SR_RELEASER_APP_ID }}
+          client-id: Iv23liUsXGDICnIdo3Ev
           private-key: ${{ secrets.SR_RELEASER_PRIVATE_KEY }}
           repositories: ${{ github.event.repository.name }}
 
@@ -156,6 +157,7 @@ jobs:
   # Tag, create the release, and attach every bundle in one step, so the
   # published release is complete the moment it appears.
   release:
+    environment: release
     needs: [plan, build]
     if: needs.plan.outputs.released == 'true'
     runs-on: ubuntu-latest
@@ -164,7 +166,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
-          app-id: ${{ secrets.SR_RELEASER_APP_ID }}
+          client-id: Iv23liUsXGDICnIdo3Ev
           private-key: ${{ secrets.SR_RELEASER_PRIVATE_KEY }}
           repositories: ${{ github.event.repository.name }}
 
