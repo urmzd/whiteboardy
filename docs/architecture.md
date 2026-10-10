@@ -94,6 +94,8 @@ also harmful: a reasoning model spends tens of seconds thinking before its first
 token, so the message bubble opens and then sits visibly empty.
 
 The client is built with [saige](https://github.com/urmzd/saige)'s `provider.Build`, which
-sends temperature and the thinking toggle only where its model catalog says the model
-accepts them. `num_ctx` has no provider-neutral option, so it is added to the built
+sends the thinking toggle only where its model catalog says the model accepts it. Sampling
+is set with saige's `creativity` dial (`focused`) rather than a raw temperature: the adapter
+compiles it to a temperature where the model takes one and drops it on models that reject
+sampling controls. `num_ctx` has no provider-neutral option, so it is added to the built
 client's chat options.
