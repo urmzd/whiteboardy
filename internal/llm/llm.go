@@ -72,6 +72,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Client, error) {
 		Provider: string(kind),
 		Model:    cfg.Model,
 		Options:  requestOptions(kind, cfg.Model),
+		Dials:    dials(),
 		// Settings are the only source of credentials and hosts, so the
 		// environment is never consulted.
 		Getenv: func(string) string { return "" },
@@ -111,12 +112,9 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Client, error) {
 	return &Client{provider: p, cfg: cfg, log: log}, nil
 }
 
-// requestOptions returns the request options for a model. Each control is
-// sent only where the catalog says the model accepts it, so Build never
+// requestOptions returns the raw request options for a model. Each control
+// is sent only where the catalog says the model accepts it, so Build never
 // rejects a model the user picked.
-//
-// Temperature is left out where it would be rejected, for example on
-// reasoning models that only sample at their defaults.
 //
 // For ollama, thinking is off for every call on models that can toggle it.
 // Schema-constrained calls need it off anyway, and for the coach's prose it
@@ -137,8 +135,17 @@ func requestOptions(kind Kind, model string) types.RequestOptions {
 	if kind == KindOllama && caps.Supports(types.CapReasoningToggle) {
 		try(func(r *types.RequestOptions) { off := false; r.ReasoningEnabled = &off })
 	}
-	try(func(r *types.RequestOptions) { t := Temperature; r.Temperature = &t })
 	return o
+}
+
+// dials returns the model-neutral generation settings for every call. The
+// adapter compiles them for the model on each request, schema-constrained
+// calls included: creativity becomes a temperature where the model takes
+// one, and is dropped on models that reject sampling controls, such as
+// reasoning models that only sample at their defaults.
+func dials() types.Dials {
+	c := Creativity
+	return types.Dials{Creativity: &c}
 }
 
 // Config returns the config the client was built from, with the API key blanked.
@@ -208,11 +215,13 @@ func Structured[T any](ctx context.Context, c *Client, system, user string, muta
 	return out, nil
 }
 
-// Temperature is the sampling temperature used for every generation. Problem
+// Creativity is the sampling intent used for every generation. Problem
 // generation wants some variety so repeated sessions do not converge on the
 // same exercise; grading wants determinism. This sits closer to the grading
-// end, and variety comes from the topic instead.
-const Temperature = 0.4
+// end, and variety comes from the topic instead. On a model that takes
+// sampling controls, focused is temperature 0.3, with top_p 0.9 where the
+// model declares it.
+const Creativity = types.CreativityFocused
 
 // contextBudget is the context window whiteboardy asks a local model for.
 // Large enough for a full review prompt, small enough that a small model on a
