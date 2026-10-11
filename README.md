@@ -1,3 +1,10 @@
+> [!IMPORTANT]
+> **This repository is archived. Development moved to [urmzd/openlearn](https://github.com/urmzd/openlearn), under [`app/`](https://github.com/urmzd/openlearn/tree/main/app/).**
+>
+> It grew from a timeboxed practice harness into **openlearn**, a desktop platform that reads a course pack, runs its exercises, and grades timed sessions written from a chapter. The harness needed a curriculum to practice against and the curriculum needed a way to be practiced, so the two now live in one repository.
+>
+> The full history of this repository was merged into openlearn, so nothing was lost: `git log -- app/` there continues from the last commit here. Open issues and pull requests against the desktop app belong in [openlearn](https://github.com/urmzd/openlearn/issues). The code below is kept as it was at the move.
+
 <p align="center">
   <h1 align="center">whiteboardy</h1>
   <p align="center">
